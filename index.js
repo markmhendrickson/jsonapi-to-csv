@@ -21,11 +21,20 @@ const s3 = new AWS.S3({
 });
 
 function loadType(type) {
-  var dir = `${dataDir}/${type}`;
+  var resources;
 
-  var files = fs.readdirSync(dir).filter((file) => file.endsWith('.json')).map((file) => JSON.parse(fs.readFileSync(`${dir}/${file}`)));
+  if (fs.existsSync(`${dataDir}/${type}`)) {
+    let dir = `${dataDir}/${type}`;
+    resources = fs.readdirSync(dir).filter((file) => file.endsWith('.json')).map((file) => JSON.parse(fs.readFileSync(`${dir}/${file}`)));
+  } else {
+    resources = JSON.parse(fs.readFileSync(`${dataDir}/${type}.json`));
 
-  async.map(files, loadResource, (err, resources) => {
+    if (resources.items) {
+      resources = resources.items;
+    }
+  }
+
+  async.map(resources, loadResource, (err, resources) => {
     fs.writeFileSync(`${dataDir}/${type}.csv`, csvParser.parse(resources));
   });
 };
@@ -48,6 +57,8 @@ function loadResource(resource, done) {
   }
 
   function flattenResource(done) {
+    if (!resource.attributes) { return done(); }
+
     Object.keys(resource.attributes).forEach((attribute) => {
       resource[attribute] = resource.attributes[attribute];
     });
@@ -76,8 +87,18 @@ function loadResource(resource, done) {
     }, done);
   }
 
+  function convertDates(done) {
+    Object.keys(resource).forEach((property) => {
+      if (property.endsWith('At') && Number.isInteger(resource[property])) {
+        resource[property] = new Date(resource[property] * 1000)
+      }
+    });
+
+    done();
+  }
+
   function loadBody(done) {
-    if (!resource.body) {
+    if (!resource.body && fs.existsSync(`${dataDir}/${resource.type}/${resource.id}.body.md`)) {
       resource.body = fs.readFileSync(`${dataDir}/${resource.type}/${resource.id}.body.md`, 'utf8');
     }
 
@@ -94,7 +115,7 @@ function loadResource(resource, done) {
     done();
   }
 
-  async.series([loadRelationships, flattenResource, loadAssets, loadBody, convertMarkdown], (err) => {
+  async.series([loadRelationships, flattenResource, loadAssets, loadBody, convertDates, convertMarkdown], (err) => {
     done(err, resource);
   });
 };
