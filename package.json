@@ -5,7 +5,7 @@
   "main": "index.js",
   "dependencies": {
     "async": "^3.2.0",
-    "aws-sdk": "^2.683.0",
+    "aws-sdk": "^2.814.0",
     "json2csv": "^5.0.1",
     "mime-type": "^3.0.7",
     "mime-types": "^2.1.27",
